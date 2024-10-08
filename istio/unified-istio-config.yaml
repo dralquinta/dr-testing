@@ -60,7 +60,7 @@ metadata:
     app: istio-ingressgateway
     istio: ingressgateway
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     istio: ingressgateway
   ports:
@@ -70,4 +70,3 @@ spec:
   - name: https
     port: 443
     targetPort: 8443
-  loadBalancerIP: 34.54.250.249 # Replace with value coming from: gcloud compute addresses describe istio-global-ip --global --format="get(address)"
