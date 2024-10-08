@@ -98,4 +98,6 @@ kubectl label namespace default istio-injection=enabled --context=gke_dryruns_us
 
 4. Deploy app in two clusters with ./deploy.sh script. 
 
-5. 
+5. Configure Global Load Balancer
+
+gcloud compute addresses create istio-global-ip --global
