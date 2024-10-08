@@ -9,6 +9,6 @@ app.get('/', (req, res) => {
   res.send(`Hello from Node.js running on node: ${nodeName}, in region: ${region}`);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(8080, '0.0.0.0', () => {
+  console.log('Server is running on http://0.0.0.0:8080');
 });
