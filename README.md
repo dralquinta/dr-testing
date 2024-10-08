@@ -225,3 +225,31 @@ customresourcedefinition.apiextensions.k8s.io/tcproutes.gateway.networking.k8s.i
 customresourcedefinition.apiextensions.k8s.io/tlsroutes.gateway.networking.k8s.io created
 customresourcedefinition.apiextensions.k8s.io/udproutes.gateway.networking.k8s.io created
 ´´´
+
+Deploy the CRDs
+
+´´´shell
+kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+
+customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io configured
+
+´´´
+
+´´´shell
+
+kubectl config use-context gke_dryruns_us-central1_cluster-iowa
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+Switched to context "gke_dryruns_us-central1_cluster-iowa".
+customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io configured
+customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io configured
+
+´´´
+
