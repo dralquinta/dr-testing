@@ -74,9 +74,28 @@ kubectl create namespace istio-system --context=gke_dryruns_us-central1_cluster-
 
 3.4 Install Istio Base and istiod with helm
 
+
+kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
 helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
 helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
 
 
+kubectl config use-context gke_dryruns_us-central1_cluster-iowa
 helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
 helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
+
+
+3.5 Enable sidecard injection
+
+kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
+kubectl label namespace default istio-injection=enabled --context=gke_dryruns_southamerica-west1_cluster-santiago
+
+
+kubectl config use-context gke_dryruns_us-central1_cluster-iowa
+kubectl label namespace default istio-injection=enabled --context=gke_dryruns_us-central1_cluster-iowa
+
+
+
+4. Deploy app in two clusters with ./deploy.sh script. 
+
+5. 

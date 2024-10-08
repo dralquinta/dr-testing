@@ -1,34 +1,15 @@
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: global-gateway
-  namespace: default
+  name: nodejs-gateway
+  namespace: istio-system
 spec:
-  gatewayClassName: gke-lb-gateway
-  listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    routes:
-      kind: HTTPRoute
-      namespaceSelector: {}
-      selector:
-        matchLabels:
-          app: nodejs-app
----
-apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: HTTPRoute
-metadata:
-  name: nodejs-route
-  namespace: default
-spec:
-  parentRefs:
-  - name: global-gateway
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /
-    backendRefs:
-    - name: nodejs-app-service
-      port: 80
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
