@@ -10,10 +10,6 @@ GKE_SECONDARY_CLUSTER_NAME="cluster-iowa"
 PRIMARY_REGION="southamerica-west1"
 SECONDARY_REGION="us-central1"
 
-
-# Build the Spring Boot JAR
-mvn clean package
-
 # Build the Docker image
 docker build -t ${GCR_REPO}/${IMAGE_NAME}:latest .
 
