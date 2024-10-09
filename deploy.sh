@@ -21,11 +21,14 @@ docker push ${GCR_REPO}/${IMAGE_NAME}:latest
 gcloud container clusters get-credentials ${GKE_PRIMARY_CLUSTER_NAME} --region ${PRIMARY_REGION} --project ${PROJECT_ID}
 # Deploy to GKE
 kubectl apply -f ./kubernetes/deploy.yaml
-kubectl apply -f ./istio/unified-istio-config.yaml
+kubectl apply -f ./istio/gateway.yaml
+kubectl apply -f ./istio/virtualservice.yaml
+
 
 #DEPLOY TO SECONDARY REGION
 # Configure kubectl to connect to your GKE cluster
 gcloud container clusters get-credentials ${GKE_SECONDARY_CLUSTER_NAME} --region ${SECONDARY_REGION} --project ${PROJECT_ID}
 # Deploy to GKE
 kubectl apply -f ./kubernetes/deploy.yaml
-kubectl apply -f ./istio/unified-istio-config.yaml
+kubectl apply -f ./istio/gateway.yaml
+kubectl apply -f ./istio/virtualservice.yaml

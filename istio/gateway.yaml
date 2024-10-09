@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
   name: nodejs-gateway
-  namespace: istio-system
+  namespace: default
 spec:
   selector:
     istio: ingressgateway
@@ -13,26 +13,3 @@ spec:
       protocol: HTTP
     hosts:
     - "*"
-
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: istio-ingressgateway
-  namespace: istio-system
-  labels:
-    app: istio-ingressgateway
-    istio: ingressgateway
-spec:
-  type: LoadBalancer
-  selector:
-    app: istio-ingressgateway
-  ports:
-  - name: http
-    port: 80
-    targetPort: 8080
-  - name: https
-    port: 443
-    targetPort: 8443
