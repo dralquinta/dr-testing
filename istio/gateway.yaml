@@ -1,11 +1,11 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: nodejs-gateway
-  namespace: default
+  name: asm-multicluster-gateway
+  namespace: istio-system
 spec:
   selector:
-    istio: ingressgateway
+    istio: ingressgateway # Use Istio's ingress gateway deployed by ASM
   servers:
   - port:
       number: 80

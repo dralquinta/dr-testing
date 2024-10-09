@@ -7,10 +7,10 @@ spec:
   hosts:
   - "*"
   gateways:
-  - nodejs-gateway
+  - asm-multicluster-gateway
   http:
   - route:
     - destination:
-        host: nodejs-app-service
+        host: nodejs-app-service.default.svc.cluster.local
         port:
           number: 80
