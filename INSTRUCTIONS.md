@@ -145,7 +145,7 @@ ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-f
 
 
 
-Add a healthcheck: 
+5.4 Add a healthcheck: 
 
 gcloud compute health-checks create http istio-health-check \
     --port 32080
@@ -161,7 +161,7 @@ gcloud compute firewall-rules create allow-istio-health-check \
 
 
 
-And then add the healthcheck to the backend: 
+5.5 And then add the healthcheck to the backend: 
 
 gcloud compute backend-services update istio-backend-santiago \
     --global --health-checks=istio-health-check
@@ -171,7 +171,7 @@ gcloud compute backend-services update istio-backend-iowa \
     --global --health-checks=istio-health-check
 
 
-Now add them to the as this: 
+5.6 Now add them to the as this: 
 
 gcloud compute backend-services add-backend istio-backend-santiago \
     --global \
