@@ -1,12 +1,9 @@
-# dr-testing
 
 
-Config: 
-
-
-1. Create two clusters: 
+1. Create clusters: 
 
 ```shell
+
 gcloud container clusters create cluster-santiago \
     --region southamerica-west1 \
     --num-nodes 1 \
@@ -21,26 +18,7 @@ gcloud container clusters create cluster-santiago \
     --enable-private-nodes \
     --enable-master-authorized-networks \
     --master-authorized-networks $(curl -s https://ifconfig.me)/32
-
 ```
-Expected Output: 
-
-```shell
-Creating cluster cluster-santiago in southamerica-west1... Cluster is being health-checked (Kubernetes Control Plane is healthy)...done.                                                                                                                                                                                                                                                                                                                                                             
-Created [https://container.googleapis.com/v1/projects/dryruns/zones/southamerica-west1/clusters/cluster-santiago].
-To inspect the contents of your cluster, go to: https://console.cloud.google.com/kubernetes/workload_/gcloud/southamerica-west1/cluster-santiago?project=dryruns
-kubeconfig entry generated for cluster-santiago.
-NAME: cluster-santiago
-LOCATION: southamerica-west1
-MASTER_VERSION: 1.30.4-gke.1348000
-MASTER_IP: 34.176.28.250
-MACHINE_TYPE: e2-medium
-NODE_VERSION: 1.30.4-gke.1348000
-NUM_NODES: 3
-STATUS: RUNNING
-```
-
-
 
 ```shell
 gcloud container clusters create cluster-iowa \
@@ -57,199 +35,226 @@ gcloud container clusters create cluster-iowa \
     --enable-private-nodes \
     --enable-master-authorized-networks \
     --master-authorized-networks $(curl -s https://ifconfig.me)/32
-
 ```
 
-Expected Output: 
+2. List cluster contexts available
 
 ```shell
-Creating cluster cluster-iowa in us-central1... Cluster is being health-checked (Kubernetes Control Plane is healthy)...done.                                                                                                                                                                                                                                                                                                                                                                        
-Created [https://container.googleapis.com/v1/projects/dryruns/zones/us-central1/clusters/cluster-iowa].
-To inspect the contents of your cluster, go to: https://console.cloud.google.com/kubernetes/workload_/gcloud/us-central1/cluster-iowa?project=dryruns
-kubeconfig entry generated for cluster-iowa.
-NAME: cluster-iowa
-LOCATION: us-central1
-MASTER_VERSION: 1.30.4-gke.1348000
-MASTER_IP: 34.171.130.3
-MACHINE_TYPE: e2-medium
-NODE_VERSION: 1.30.4-gke.1348000
-NUM_NODES: 3
-STATUS: RUNNING
+kubectl config get-contexts
+CURRENT   NAME                                              CLUSTER                                           AUTHINFO                                          NAMESPACE
+          gke_dryruns_southamerica-west1-a_cluster-1        gke_dryruns_southamerica-west1-a_cluster-1        gke_dryruns_southamerica-west1-a_cluster-1        
+          gke_dryruns_southamerica-west1_cluster-1          gke_dryruns_southamerica-west1_cluster-1          gke_dryruns_southamerica-west1_cluster-1          
+*         gke_dryruns_southamerica-west1_cluster-santiago   gke_dryruns_southamerica-west1_cluster-santiago   gke_dryruns_southamerica-west1_cluster-santiago   
+          gke_dryruns_us-central1_cluster-iowa              gke_dryruns_us-central1_cluster-iowa              gke_dryruns_us-central1_cluster-iowa      
 ```
 
 
-2. Deploy Application to both clusters
+
+3. Install istio
+
+3.1 Download Locally
 
 ```shell
-./deploy.sh 
-[+] Building 0.
-...
-The push refers to repository [southamerica-west1-docker.pkg.dev/dryruns/dr-testing/dr-testing]
-e18e2beb0330: Pushed 
-de7407064b33: Layer already exists 
-b37263c91ce8: Layer already exists 
-9c8af17347b2: Layer already exists 
-365ccd918307: Layer already exists 
-1bba629c69e9: Layer already exists 
-139c1270acf1: Layer already exists 
-4693057ce236: Layer already exists 
-latest: digest: sha256:064b2978962d57c51bc27b9fe07ea0eacb8ee0b08a535ebf5508efd2ca70b0d1 size: 1992
-Fetching cluster endpoint and auth data.
-kubeconfig entry generated for cluster-santiago.
-deployment.apps/nodejs-app created
-service/nodejs-app-service created
-Fetching cluster endpoint and auth data.
-kubeconfig entry generated for cluster-iowa.
-deployment.apps/nodejs-app created
-service/nodejs-app-service created
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-*
+export PATH=$PWD/bin:$PATH
 ```
 
-3. Configure Multi-Regional Ingress
-
-3.1 Reserve IP
+3.2 Update helm repos
 
 ```shell
-gcloud compute addresses create gke-global-ip --global
-Created [https://www.googleapis.com/compute/v1/projects/dryruns/global/addresses/gke-global-ip].
-```
-
-3.2 Register Clusters to an Anthos Fleet
-
-Enable API.
-
-```shell
-gcloud services enable \
-    gkehub.googleapis.com \
-    multiclusteringress.googleapis.com \
-    container.googleapis.com
-Operation "operations/acat.p2-551624959543-b6210c9f-6764-4d17-b607-ac03e51db9b9" finished successfully.
-```
-
-Enable Workload Identity
-
-```shell
-gcloud container clusters update cluster-santiago \
-    --region=southamerica-west1 \
-    --workload-pool=$(gcloud config get-value project).svc.id.goog
-
-
-    Updating cluster-santiago...done.                                                                                                                                                                                                                        
-Updated [https://container.googleapis.com/v1/projects/dryruns/zones/southamerica-west1/clusters/cluster-santiago].
-To inspect the contents of your cluster, go to: https://console.cloud.google.com/kubernetes/workload_/gcloud/southamerica-west1/cluster-santiago?project=dryruns
-
-```
-
-```shell
-gcloud container clusters update cluster-iowa \
-    --region=us-central1 \
-    --workload-pool=$(gcloud config get-value project).svc.id.goog
-Updating cluster-iowa...done.                                                                                                                                                                                                                                   
-Updated [https://container.googleapis.com/v1/projects/dryruns/zones/us-central1/clusters/cluster-iowa].
-To inspect the contents of your cluster, go to: https://console.cloud.google.com/kubernetes/workload_/gcloud/us-central1/cluster-iowa?project=dryruns
-
-```
-
-Review that configuration of WI was done correctly
-
-```shell
-gcloud container clusters describe cluster-santiago --region=southamerica-west1 --format="get(workloadIdentityConfig.workloadPool)"
-gcloud container clusters describe cluster-iowa --region=us-central1 --format="get(workloadIdentityConfig.workloadPool)"
-
-```
-
-Join clusters into fleet: 
-
-´´´shell
-gcloud container fleet memberships register cluster-santiago \
-    --gke-cluster=southamerica-west1/cluster-santiago \
-    --enable-workload-identity
-
-
-gcloud container fleet memberships register cluster-iowa \
-    --gke-cluster=us-central1/cluster-iowa \
-    --enable-workload-identity
-´´´
-
-
-Expected result: 
-
-´´´shell
-Waiting for membership to be created...done.                                                                                                                                                                                      
-Finished registering to the Fleet.
-´´´
-
-
-Check fleet registry
-
-´´´shell
-gcloud container fleet memberships list
-NAME: cluster-santiago
-UNIQUE_ID: e11be610-eab1-4a27-8444-6c62a192befa
-LOCATION: southamerica-west1
-
-NAME: cluster-iowa
-UNIQUE_ID: 45a2b410-985b-49f3-91a4-9864e976a439
-LOCATION: us-central1
-´´´
-
-3.3 Setup Gateway API for Multicluster Ingress
-
-´´´shell
-kubectl config use-context gke_dryruns_us-central1_cluster-iowa
-kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.2.0"
-customresourcedefinition.apiextensions.k8s.io/backendlbpolicies.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/backendtlspolicies.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/tcproutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/tlsroutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/udproutes.gateway.networking.k8s.io created
-´´´
-
-
-´´´shell
 kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
+helm repo add istio.io https://istio-release.storage.googleapis.com/charts
+helm repo update
+```
 
-kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.2.0"
-customresourcedefinition.apiextensions.k8s.io/backendlbpolicies.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/backendtlspolicies.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/tcproutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/tlsroutes.gateway.networking.k8s.io created
-customresourcedefinition.apiextensions.k8s.io/udproutes.gateway.networking.k8s.io created
-´´´
-
-Deploy the CRDs
-
-´´´shell
-kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
-
-customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io configured
-
-´´´
-
-´´´shell
-
+```shell
 kubectl config use-context gke_dryruns_us-central1_cluster-iowa
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
-Switched to context "gke_dryruns_us-central1_cluster-iowa".
-customresourcedefinition.apiextensions.k8s.io/gatewayclasses.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/gateways.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/grpcroutes.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/httproutes.gateway.networking.k8s.io configured
-customresourcedefinition.apiextensions.k8s.io/referencegrants.gateway.networking.k8s.io configured
+helm repo add istio.io https://istio-release.storage.googleapis.com/charts
+helm repo update
+```
 
-´´´
+3.3 Create contexts in both clusters
 
+```shell
+kubectl create namespace istio-system --context=gke_dryruns_southamerica-west1_cluster-santiago
+kubectl create namespace istio-system --context=gke_dryruns_us-central1_cluster-iowa
+```
+
+3.4 Install Istio Base and istiod with helm
+
+```shell
+kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
+helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
+helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
+```
+
+
+```shell
+kubectl config use-context gke_dryruns_us-central1_cluster-iowa
+helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
+helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
+```
+
+3.5 Enable sidecard injection
+
+```shell
+kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
+kubectl label namespace default istio-injection=enabled --context=gke_dryruns_southamerica-west1_cluster-santiago
+```
+
+```shell
+kubectl config use-context gke_dryruns_us-central1_cluster-iowa
+kubectl label namespace default istio-injection=enabled --context=gke_dryruns_us-central1_cluster-iowa
+```
+
+
+4. Deploy app in two clusters with ./deploy.sh script. 
+
+5. Configure Global Load Balancer
+
+5.1 Reserve global IP
+
+```shell
+gcloud compute addresses create istio-global-ip --global
+```
+
+5.2 Create backend services
+
+```shell
+gcloud compute backend-services create istio-backend-santiago \
+    --global \
+    --load-balancing-scheme=EXTERNAL \
+    --protocol=HTTP
+```
+
+```shell
+gcloud compute backend-services create istio-backend-iowa \
+    --global \
+    --load-balancing-scheme=EXTERNAL \
+    --protocol=HTTP
+```
+
+5.3 Add the groups to the backend services. 
+
+get them first with these commands: 
+
+```shell
+gcloud compute instance-groups list --filter="zone:southamerica-west1-*" --format="table(name,zone)"
+NAME: gke-cluster-santiago-default-pool-6a0fc512-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-a
+
+NAME: gke-cluster-santiago-default-pool-d3ac9b18-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-b
+
+NAME: gke-cluster-santiago-default-pool-600d0f70-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-c
+```
+
+```shell
+gcloud compute instance-groups list --filter="zone:us-central1-*" --format="table(name,zone)"
+NAME: gke-cluster-iowa-default-pool-78f0eaa2-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-a
+
+NAME: gke-cluster-iowa-default-pool-ba304c41-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-c
+
+NAME: gke-cluster-iowa-default-pool-de9dd29f-grp
+ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-f
+```
+
+
+5.4 Add a healthcheck: 
+
+```shell
+gcloud compute health-checks create http istio-health-check \
+    --port 32080
+```
+
+Create firewall rules to allow healthcheck: 
+
+```shell
+gcloud compute firewall-rules create allow-istio-health-check \
+    --network=my-custom-vpc \
+    --allow=tcp:32080 \
+    --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+    --target-tags=gke-ingress
+```
+
+
+5.5 And then add the healthcheck to the backend: 
+
+```shell
+gcloud compute backend-services update istio-backend-santiago \
+    --global --health-checks=istio-health-check
+```
+
+
+```shell
+gcloud compute backend-services update istio-backend-iowa \
+    --global --health-checks=istio-health-check
+```
+
+5.6 Now add them to the as this: 
+
+```shell
+gcloud compute backend-services add-backend istio-backend-santiago \
+    --global \
+    --instance-group=gke-cluster-santiago-default-pool-6a0fc512-grp \
+    --instance-group-zone=southamerica-west1-a
+```
+
+```shell
+gcloud compute backend-services add-backend istio-backend-santiago \
+    --global \
+    --instance-group=gke-cluster-santiago-default-pool-d3ac9b18-grp \
+    --instance-group-zone=southamerica-west1-b
+```
+
+```shell
+gcloud compute backend-services add-backend istio-backend-santiago \
+    --global \
+    --instance-group=gke-cluster-santiago-default-pool-600d0f70-grp \
+    --instance-group-zone=southamerica-west1-c
+```
+
+```shell
+gcloud compute backend-services add-backend istio-backend-iowa \
+    --global \
+    --instance-group=gke-cluster-iowa-default-pool-78f0eaa2-grp \
+    --instance-group-zone=us-central1-a
+```
+
+```shell
+gcloud compute backend-services add-backend istio-backend-iowa \
+    --global \
+    --instance-group=gke-cluster-iowa-default-pool-ba304c41-grp \
+    --instance-group-zone=us-central1-c
+
+```shell
+gcloud compute backend-services add-backend istio-backend-iowa \
+    --global \
+    --instance-group=gke-cluster-iowa-default-pool-de9dd29f-grp \
+    --instance-group-zone=us-central1-f
+```
+
+6. Configure the load balancer
+
+```shell
+gcloud compute url-maps create istio-url-map \
+    --default-service=istio-backend-santiago
+```
+
+```shell
+gcloud compute target-http-proxies create istio-http-proxy \
+    --url-map=istio-url-map
+```
+
+
+```shell
+gcloud compute forwarding-rules create istio-http-forwarding-rule \
+    --global \
+    --target-http-proxy=istio-http-proxy \
+    --ports=80 \
+    --address=istio-global-ip
+```
