@@ -101,6 +101,17 @@ gcloud container fleet memberships register $CLUSTER_NAME_IOWA \
     --enable-workload-identity
 ```
 
+Enable ASM Membership
+
+
+```shell
+gcloud container fleet ingress enable --project $PROJECT_ID
+```
+
+It'll ask for which cluster to enable. Enable them both. 
+
+
+
 Deploy sample app to both clusters.
 
 This will also deploy gateway and virutalservice configurations
@@ -109,3 +120,17 @@ This will also deploy gateway and virutalservice configurations
 ./deploy.sh
 ```
 
+
+Ensure both have extenral Igress gateway IPs
+
+Santiago
+
+```shell
+kubectl get svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA}
+```
+
+Iowa
+
+```shell
+kubectl get svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA}
+```
