@@ -161,11 +161,28 @@ kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_I
 ```
 
 
+NOTE: 
+
+In case patching to Load Balancer back is required, use: 
+
+```shell
+kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_XXX}_${CLUSTER_NAME_XXX} -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+
 Create Healthcheck
 
 ```shell
 gcloud compute health-checks create http istio-health-check \
-    --port 15020
+    --port 15021
+```
+
+Update the URI of the healthcheck
+
+```shell
+gcloud compute health-checks update http istio-health-check \
+    --request-path="/healthz/ready"
+
 ```
 
 Create Firewall Rule
@@ -173,9 +190,9 @@ Create Firewall Rule
 ```shell
 gcloud compute firewall-rules create allow-istio-health-check \
     --network=my-custom-vpc \
-    --allow=tcp:32080,15020 \
+    --allow=tcp:15021 \
     --source-ranges=0.0.0.0/0,130.211.0.0/22,35.191.0.0/16 \
-    --target-tags=gke-ingress
+    --target-tags=all
 ```
 Create the L7 Load Balancer using the console
 
