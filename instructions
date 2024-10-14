@@ -1,0 +1,251 @@
+Set up a multi-cluster mesh on managed Cloud Service Mesh
+
+bookmark_border
+Note: This guide only supports Cloud Service Mesh with Istio APIs and does not support Google Cloud APIs. For more information see, Cloud Service Mesh overview.
+This guide explains how to join two clusters into a single Cloud Service Mesh using Mesh CA or Certificate Authority Service and enable cross-cluster load balancing. You can easily extend this process to incorporate any number of clusters into your mesh.
+
+A multi-cluster Cloud Service Mesh configuration can solve several crucial enterprise scenarios, such as scale, location, and isolation. For more information, see Multi-cluster use cases.
+
+Prerequisites
+This guide assumes that you have two or more Google Cloud GKE clusters that meet the following requirements:
+
+Cloud Service Mesh installed on the clusters. You need asmcli, the istioctl tool, and samples that asmcli downloads to the directory that you specified in --output_dir.
+Clusters in your mesh must have connectivity between all pods before you configure Cloud Service Mesh. Additionally, if you join clusters that are not in the same project, they must be registered to the same fleet host project, and the clusters must be in a shared VPC configuration together on the same network. We also recommend that you have one project to host the Shared VPC, and two service projects for creating clusters. For more information, see Setting up clusters with Shared VPC.
+If you use Certificate Authority Service, all clusters must have their respective subordinate CA pools chain to the same root CA pool. Otherwise, all of them will need to use the same CA pool.
+Setting project and cluster variables
+Create the following environment variables for the project ID, cluster zone or region, cluster name, and context.
+
+
+
+export PROJECT_1=PROJECT_ID_1
+export LOCATION_1=CLUSTER_LOCATION_1
+export CLUSTER_1=CLUSTER_NAME_1
+export CTX_1="gke_${PROJECT_1}_${LOCATION_1}_${CLUSTER_1}"
+
+export PROJECT_2=PROJECT_ID_2
+export LOCATION_2=CLUSTER_LOCATION_2
+export CLUSTER_2=CLUSTER_NAME_2
+export CTX_2="gke_${PROJECT_2}_${LOCATION_2}_${CLUSTER_2}"
+If these are newly created clusters, ensure to fetch credentials for each cluster with the following gcloud commands otherwise their associated context will not be available for use in the next steps of this guide.
+
+The commands depend on your cluster type, either regional or zonal:
+
+Regional
+Zonal
+
+
+gcloud container clusters get-credentials ${CLUSTER_1} --region ${LOCATION_1}
+gcloud container clusters get-credentials ${CLUSTER_2} --region ${LOCATION_2}
+Create firewall rule
+In some cases, you need to create a firewall rule to allow cross-cluster traffic. For example, you need to create a firewall rule if:
+
+You use different subnets for the clusters in your mesh.
+Your Pods open ports other than 443 and 15002.
+GKE automatically adds firewall rules to each node to allow traffic within the same subnet. If your mesh contains multiple subnets, you must explicitly set up the firewall rules to allow cross-subnet traffic. You must add a new firewall rule for each subnet to allow the source IP CIDR blocks and targets ports of all the incoming traffic.
+
+The following instructions allow communication between all clusters in your project or only between $CLUSTER_1 and $CLUSTER_2.
+
+Gather information about your clusters' network.
+
+All project clusters
+Specific clusters
+If the clusters are in the same project, you can use the following command to allow communication between all clusters in your project. If there are clusters in your project that you don't want to expose, use the command in the Specific clusters tab.
+
+
+
+function join_by { local IFS="$1"; shift; echo "$*"; }
+ALL_CLUSTER_CIDRS=$(gcloud container clusters list --project $PROJECT_1 --format='value(clusterIpv4Cidr)' | sort | uniq)
+ALL_CLUSTER_CIDRS=$(join_by , $(echo "${ALL_CLUSTER_CIDRS}"))
+ALL_CLUSTER_NETTAGS=$(gcloud compute instances list --project $PROJECT_1 --format='value(tags.items.[0])' | sort | uniq)
+ALL_CLUSTER_NETTAGS=$(join_by , $(echo "${ALL_CLUSTER_NETTAGS}"))
+Create the firewall rule.
+
+GKE
+Autopilot
+
+
+gcloud compute firewall-rules create istio-multicluster-pods \
+    --allow=tcp,udp,icmp,esp,ah,sctp \
+    --direction=INGRESS \
+    --priority=900 \
+    --source-ranges="${ALL_CLUSTER_CIDRS}" \
+    --target-tags="${ALL_CLUSTER_NETTAGS}" --quiet \
+    --network=YOUR_NETWORK
+Configure endpoint discovery
+Note: For more information on endpoint discovery, refer to Endpoint discovery with multiple control planes.
+Warning: If endpoint discovery is enabled between clusters, intercluster services are not able to communicate with each other without proper DNS configuration. This is because GKE services depend on each service's fully qualified domain name (FQDN) for traffic routing. You can enable DNS proxy, to allow intercluster discovery. DNS proxy captures all DNS requests and resolves them using information from the Control Plane.
+Enable endpoint discovery between public or private clusters with declarative API
+Enabling managed Cloud Service Mesh with the fleet API will enable endpoint discovery for this cluster. If you provisioned managed Cloud Service Mesh with a different tool, you can manually enable endpoint discovery across public or private clusters in a fleet by applying the config "multicluster_mode":"connected" in the asm-options configmap. Clusters with this config enabled in the same fleet will have cross-cluster service discovery automatically enabled between each other.
+
+Warning: Don't use this method if your clusters use existing in-cluster remote secrets.
+This is the only way to configure multi-cluster endpoint discovery if you have the Managed (TD) control plane implementation, and the recommended way to configure it if you have the Managed (Istiod) implementation.
+
+Before proceeding, you must have created a firewall rule.
+
+Enable
+Disable
+If the asm-options configmap already exists in your cluster, then enable endpoint discovery for the cluster:
+
+
+
+      kubectl patch configmap/asm-options -n istio-system --type merge -p '{"data":{"multicluster_mode":"connected"}}'
+If the asm-options configmap doesn't yet exist in your cluster, then create it with the associated data and enable endpoint discovery for the cluster:
+
+
+
+      kubectl --context ${CTX_1} create configmap asm-options -n istio-system --from-file <(echo '{"data":{"multicluster_mode":"connected"}}')
+If you unregister a cluster from the fleet without disabling endpoint discovery, secrets could remain in the cluster. You must manually clean up any remaining secrets.
+
+Run the following command to find secrets requiring cleanup:
+
+
+
+kubectl get secrets -n istio-system -l istio.io/owned-by=mesh.googleapis.com,istio/multiCluster=true
+Delete each secret:
+
+
+
+kubectl delete secret SECRET_NAME
+Repeat this step for each remaining secret.
+
+Verify multi-cluster connectivity
+This section explains how to deploy the sample HelloWorld and Sleep services to your multi-cluster environment to verify that cross-cluster load balancing works.
+
+Note: These sample services are located in the Istio samples directory included in the istioctl tar file (located in OUTPUT_DIR/istio-${ASM_VERSION%+*}/samples) and not the samples directory downloaded by asmcli (located in OUTPUT_DIR/samples).
+Set variable for samples directory
+Navigate to where asmcli was downloaded, and run the following command to set ASM_VERSION
+
+
+
+export ASM_VERSION="$(./asmcli --version)"
+Set a working folder to the samples that you use to verify that cross-cluster load balancing works. The samples are located in a subdirectory in the --output_dir directory that you specified in the asmcli install command. In the following command, change OUTPUT_DIR to the directory that you specified in --output_dir.
+
+
+
+export SAMPLES_DIR=OUTPUT_DIR/istio-${ASM_VERSION%+*}
+Enable sidecar injection
+Create the sample namespace in each cluster.
+
+
+
+for CTX in ${CTX_1} ${CTX_2}
+do
+    kubectl create --context=${CTX} namespace sample
+done
+Enable the namespace for injection. The steps depend on your control plane implementation.
+
+Managed (TD)
+Managed (Istiod)
+Apply the default injection label to the namespace:
+
+
+for CTX in ${CTX_1} ${CTX_2}
+do
+   kubectl label --context=${CTX} namespace sample \
+      istio.io/rev- istio-injection=enabled --overwrite
+done
+Install the HelloWorld service
+Note: The HelloWorld service example uses Docker Hub. In a private cluster, the container runtime can pull container images from Artifact Registry by default. The container runtime cannot pull images from any other container image registry on the internet. You can download the image and push to Artifact Registry or use Cloud NAT to provide outbound internet access for certain private nodes. For more information, see Migrate external containers and Creating a private cluster.
+Create the HelloWorld service in both clusters:
+
+
+
+kubectl create --context=${CTX_1} \
+    -f ${SAMPLES_DIR}/samples/helloworld/helloworld.yaml \
+    -l service=helloworld -n sample
+
+
+kubectl create --context=${CTX_2} \
+    -f ${SAMPLES_DIR}/samples/helloworld/helloworld.yaml \
+    -l service=helloworld -n sample
+Deploy HelloWorld v1 and v2 to each cluster
+Deploy HelloWorld v1 to CLUSTER_1 and v2 to CLUSTER_2, which helps later to verify cross-cluster load balancing:
+
+
+
+kubectl create --context=${CTX_1} \
+  -f ${SAMPLES_DIR}/samples/helloworld/helloworld.yaml \
+  -l version=v1 -n sample
+
+
+kubectl create --context=${CTX_2} \
+  -f ${SAMPLES_DIR}/samples/helloworld/helloworld.yaml \
+  -l version=v2 -n sample
+Confirm HelloWorld v1 and v2 are running using the following commands. Verify that the output is similar to that shown.:
+
+
+
+kubectl get pod --context=${CTX_1} -n sample
+
+NAME                            READY     STATUS    RESTARTS   AGE
+helloworld-v1-86f77cd7bd-cpxhv  2/2       Running   0          40s
+
+
+kubectl get pod --context=${CTX_2} -n sample
+
+NAME                            READY     STATUS    RESTARTS   AGE
+helloworld-v2-758dd55874-6x4t8  2/2       Running   0          40s
+Deploy the Sleep service
+Deploy the Sleep service to both clusters. This pod generates artificial network traffic for demonstration purposes:
+
+
+
+for CTX in ${CTX_1} ${CTX_2}
+do
+    kubectl apply --context=${CTX} \
+        -f ${SAMPLES_DIR}/samples/sleep/sleep.yaml -n sample
+done
+Wait for the Sleep service to start in each cluster. Verify that the output is similar to that shown:
+
+
+
+kubectl get pod --context=${CTX_1} -n sample -l app=sleep
+
+NAME                             READY   STATUS    RESTARTS   AGE
+sleep-754684654f-n6bzf           2/2     Running   0          5s
+
+
+kubectl get pod --context=${CTX_2} -n sample -l app=sleep
+
+NAME                             READY   STATUS    RESTARTS   AGE
+sleep-754684654f-dzl9j           2/2     Running   0          5s
+Verify cross-cluster load balancing
+Call the HelloWorld service several times and check the output to verify alternating replies from v1 and v2:
+
+Call the HelloWorld service:
+
+
+
+kubectl exec --context="${CTX_1}" -n sample -c sleep \
+    "$(kubectl get pod --context="${CTX_1}" -n sample -l \
+    app=sleep -o jsonpath='{.items[0].metadata.name}')" \
+    -- /bin/sh -c 'for i in $(seq 1 20); do curl -sS helloworld.sample:5000/hello; done'
+The output is similar to that shown:
+
+
+Hello version: v2, instance: helloworld-v2-758dd55874-6x4t8
+Hello version: v1, instance: helloworld-v1-86f77cd7bd-cpxhv
+...
+Call the HelloWorld service again:
+
+
+
+kubectl exec --context="${CTX_2}" -n sample -c sleep \
+    "$(kubectl get pod --context="${CTX_2}" -n sample -l \
+    app=sleep -o jsonpath='{.items[0].metadata.name}')" \
+    -- /bin/sh -c 'for i in $(seq 1 20); do curl -sS helloworld.sample:5000/hello; done'
+The output is similar to that shown:
+
+
+Hello version: v2, instance: helloworld-v2-758dd55874-6x4t8
+Hello version: v1, instance: helloworld-v1-86f77cd7bd-cpxhv
+...
+Congratulations, you've verified your load-balanced, multi-cluster Cloud Service Mesh!
+
+Clean up HelloWorld service
+When you finish verifying load balancing, remove the HelloWorld and Sleep service from your cluster.
+
+
+
+kubectl delete ns sample --context ${CTX_1}
+kubectl delete ns sample --context ${CTX_2}

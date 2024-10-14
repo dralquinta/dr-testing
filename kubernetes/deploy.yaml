@@ -28,7 +28,6 @@ kind: Service
 metadata:
   name: nodejs-app-service
 spec:
-  type: NodePort
   selector:
     app: nodejs-app
   ports:

@@ -15,7 +15,7 @@ export SUBNET_IOWA="custom-subnet-iowa"
 
 Create clusters: 
 
-``shell
+```shell
 gcloud container clusters create $CLUSTER_NAME_SA \
     --region $REGION_SA \
     --enable-ip-alias \
@@ -121,6 +121,19 @@ This will also deploy gateway and virutalservice configurations
 ```
 
 
+
+Deploy Ingress Gateway
+
+```shell
+kubectl apply -f istio-ingressgateway.yaml --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA}
+```
+
+´´´shell
+kubectl apply -f istio-ingressgateway.yaml --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA}
+´´´
+
+
+
 Ensure both have extenral Igress gateway IPs
 
 Santiago
@@ -134,3 +147,47 @@ Iowa
 ```shell
 kubectl get svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA}
 ```
+
+
+Reserve IP for the ingress
+
+```shell
+gcloud compute addresses create asm-global-ip --global
+```
+
+Annotate Istio Ingress Gateway to use the Global IP
+
+```shell
+kubectl annotate svc istio-ingressgateway -n istio-system \
+    --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA} \
+    cloud.google.com/load-balancer-type=External
+```
+
+```shell
+kubectl annotate svc istio-ingressgateway -n istio-system \
+    --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA} \
+    cloud.google.com/load-balancer-type=External
+```
+
+Patch the service to use the reserved global IP
+
+
+
+```shell
+kubectl patch svc istio-ingressgateway -n istio-system \
+    --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA} \
+    -p '{"spec":{"loadBalancerIP":"<your-global-ip>"}}'
+```
+
+´´´shell
+kubectl patch svc istio-ingressgateway -n istio-system \
+    --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA} \
+    -p '{"spec":{"loadBalancerIP":"<your-global-ip>"}}'
+´´´
+
+
+The IP is the value from the reserved IP gotten in previous steps
+
+
+Enable Multi-Cluster Ingress with GCLB
+
