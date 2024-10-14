@@ -147,6 +147,15 @@ gcloud compute health-checks create http istio-health-check \
     --port 15020
 ```
 
+Create Firewall Rule
+
+```shell
+gcloud compute firewall-rules create allow-istio-health-check \
+    --network=my-custom-vpc \
+    --allow=tcp:32080,15020 \
+    --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+    --target-tags=gke-ingress
+```
 Create the L7 Load Balancer using the console
 
 See: https://medium.com/niveus-solutions/deploying-anthos-service-mesh-on-private-gke-and-configuring-asm-with-cloud-load-balancing-e47d76c98978 

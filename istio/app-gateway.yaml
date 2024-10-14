@@ -5,7 +5,7 @@ metadata:
   namespace: istio-system
 spec:
   selector:
-    istio: istio-ingressgateway # Use Istio's ingress gateway deployed by ASM
+    istio: ingressgateway # Use Istio's ingress gateway deployed by ASM
   servers:
   - port:
       number: 80
