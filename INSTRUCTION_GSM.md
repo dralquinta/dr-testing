@@ -115,9 +115,17 @@ asmcli install \
     --option legacy-default-ingressgateway
 ```
 
+Enable Istio Proxy Sidecar injection: 
+
+```shell
+kubectl label namespace default istio-injection=enabled --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA}
+```
+
+```shell
+kubectl label namespace default istio-injection=enabled --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA}
+```
 
 Patch the istio-ingressgateways to be a NEG
-
 
 ```shell
 kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA} -p \
@@ -132,6 +140,12 @@ kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_I
 ```
 
 
+Create Healthcheck
+
+```shell
+gcloud compute health-checks create http istio-health-check \
+    --port 15020
+```
 
 Create the L7 Load Balancer using the console
 
