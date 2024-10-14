@@ -22,7 +22,7 @@ gcloud container clusters create $CLUSTER_NAME_SA \
     --network "projects/$PROJECT_ID/global/networks/my-custom-vpc" \
     --subnetwork $SUBNET_SA \
     --machine-type "e2-medium" \
-    --num-nodes 1 \
+    --num-nodes 2 \
     --workload-pool="$PROJECT_ID.svc.id.goog"
 ```
 
@@ -34,7 +34,7 @@ gcloud container clusters create $CLUSTER_NAME_IOWA \
     --network "projects/$PROJECT_ID/global/networks/my-custom-vpc" \
     --subnetwork $SUBNET_IOWA \
     --machine-type "e2-medium" \
-    --num-nodes 1 \
+    --num-nodes 2 \
     --workload-pool="$PROJECT_ID.svc.id.goog"
 ```
 
@@ -47,6 +47,15 @@ gcloud container clusters get-credentials $CLUSTER_NAME_IOWA --region $REGION_IO
 ```
 
 
+Deploy sample app to both clusters.
+
+This will also deploy gateway and virutalservice configurations
+
+```shell
+./deploy.sh
+```
+
+
 Install ASM
 
 ```shell
@@ -54,30 +63,6 @@ curl https://storage.googleapis.com/csm-artifacts/asm/asmcli > asmcli
 chmod +x asmcli
 sudo mv asmcli /usr/bin
 ```
-
-
-Install ASM in both clusters
-
-```shell
-asmcli install \
-    --project_id $PROJECT_ID \
-    --cluster_name $CLUSTER_NAME_SA \
-    --cluster_location $REGION_SA \
-    --fleet_id $PROJECT_ID \
-    --output_dir ./asm-output \
-    --enable_all
-```
-
-```shell
-asmcli install \
-    --project_id $PROJECT_ID \
-    --cluster_name $CLUSTER_NAME_IOWA \
-    --cluster_location $REGION_IOWA \
-    --fleet_id $PROJECT_ID \
-    --output_dir ./asm-output \
-    --enable_all
-```
-
 
 Enable workload Identity
 
@@ -101,6 +86,60 @@ gcloud container fleet memberships register $CLUSTER_NAME_IOWA \
     --enable-workload-identity
 ```
 
+
+Install ASM in both clusters
+
+```shell
+asmcli install \
+    --project_id $PROJECT_ID \
+    --cluster_name $CLUSTER_NAME_SA \
+    --cluster_location $REGION_SA \
+    --fleet_id $PROJECT_ID \
+    --output_dir ./asm-output \
+    --enable_all \
+    --ca mesh_ca \
+    --enable_gcp_components \
+    --option legacy-default-ingressgateway 
+```
+
+```shell
+asmcli install \
+    --project_id $PROJECT_ID \
+    --cluster_name $CLUSTER_NAME_IOWA \
+    --cluster_location $REGION_IOWA \
+    --fleet_id $PROJECT_ID \
+    --output_dir ./asm-output \
+    --enable_all \
+    --ca mesh_ca \
+    --enable_gcp_components \
+    --option legacy-default-ingressgateway
+```
+
+
+Patch the istio-ingressgateways to be a NEG
+
+
+```shell
+kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA} -p \
+'{"spec": {"type": "NodePort"}, "metadata": {"annotations": {"cloud.google.com/neg": "{\"exposed_ports\":{\"80\":{\"name\": \"istio-http-santiago\"}}}"}}}'
+
+```
+
+```shell
+kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA} -p \
+'{"spec": {"type": "NodePort"}, "metadata": {"annotations": {"cloud.google.com/neg": "{\"exposed_ports\":{\"80\":{\"name\": \"istio-http-iowa\"}}}"}}}'
+
+```
+
+
+
+Create the L7 Load Balancer using the console
+
+See: https://medium.com/niveus-solutions/deploying-anthos-service-mesh-on-private-gke-and-configuring-asm-with-cloud-load-balancing-e47d76c98978 
+
+
+
+
 Enable ASM Membership
 
 
@@ -112,13 +151,18 @@ It'll ask for which cluster to enable. Enable them both.
 
 
 
-Deploy sample app to both clusters.
 
-This will also deploy gateway and virutalservice configurations
 
-```shell
-./deploy.sh
-```
+
+
+
+
+HASTA AQUI TODO OK!
+
+
+-------
+
+
 
 
 
