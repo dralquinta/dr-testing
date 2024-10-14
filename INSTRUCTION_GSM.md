@@ -125,6 +125,16 @@ This will also deploy gateway and virutalservice configurations
 ./deploy.sh
 ```
 
+Create namespace for istio-gateway
+
+```shell
+kubectl create namespace istio-gateway --context=gke_${PROJECT_ID}_${REGION_SA}_${CLUSTER_NAME_SA}
+```
+
+```shell
+kubectl create namespace istio-gateway --context=gke_${PROJECT_ID}_${REGION_IOWA}_${CLUSTER_NAME_IOWA}
+```
+
 Deploy Gateway and Virtual Service Configuration
 
 ```shell
