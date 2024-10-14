@@ -2,7 +2,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
   name: asm-multicluster-gateway
-  namespace: istio-gateway
+  namespace: default
 spec:
   selector:
     istio: ingressgateway # Use Istio's ingress gateway deployed by ASM
