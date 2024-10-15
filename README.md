@@ -1,260 +1,31 @@
+# Setting up Multi-cluster Ingress with Anthos Service Mesh
+
+The following set of instructions explain how to set up a Multi-Cluster Mesh using Anthos Service Mesh (ASM)
+
+## Architecture
+
+The following diagram shows end goal of configuration
+
+![](./img/Service-Mesh.jpg)
+
+The configuration will allow an external global application load balancer, enter the application served inside two regional clusters, via an ingress gateway which later will be routed to an envoy proxy embedded inside Istio Side Car, injected inside the deployment pod. 
+
+For mode details on how this works, refer to the following [video](https://www.youtube.com/watch?v=UuFR_FztLK0) 
 
 
-1. Create clusters: 
+
+## Instructions
+
+1. Open Cloud Shell and set up the following variables in as much terminals you will use. 
 
 ```shell
-
-gcloud container clusters create cluster-santiago \
-    --region southamerica-west1 \
-    --num-nodes 1 \
-    --enable-autoscaling \
-    --min-nodes 1 \
-    --max-nodes 6 \
-    --release-channel regular \
-    --network=my-custom-vpc \
-    --subnetwork=custom-subnet-santiago \
-    --enable-ip-alias \
-    --enable-network-policy \
-    --enable-private-nodes \
-    --enable-master-authorized-networks \
-    --master-authorized-networks $(curl -s https://ifconfig.me)/32
+export PROJECT_ID=$(gcloud config get-value project)
+export CLUSTER_NAME_SA="cluster-santiago"
+export CLUSTER_NAME_IOWA="cluster-iowa"
+export REGION_SA="southamerica-west1"
+export REGION_IOWA="us-central1"
+export SUBNET_SA="custom-subnet-santiago"
+export SUBNET_IOWA="custom-subnet-iowa"
 ```
 
-```shell
-gcloud container clusters create cluster-iowa \
-    --region us-central1 \
-    --num-nodes 1 \
-    --enable-autoscaling \
-    --min-nodes 1 \
-    --max-nodes 6 \
-    --release-channel regular \
-    --network=my-custom-vpc \
-    --subnetwork=custom-subnet-iowa \
-    --enable-ip-alias \
-    --enable-network-policy \
-    --enable-private-nodes \
-    --enable-master-authorized-networks \
-    --master-authorized-networks $(curl -s https://ifconfig.me)/32
-```
-
-2. List cluster contexts available
-
-```shell
-kubectl config get-contexts
-CURRENT   NAME                                              CLUSTER                                           AUTHINFO                                          NAMESPACE
-          gke_dryruns_southamerica-west1-a_cluster-1        gke_dryruns_southamerica-west1-a_cluster-1        gke_dryruns_southamerica-west1-a_cluster-1        
-          gke_dryruns_southamerica-west1_cluster-1          gke_dryruns_southamerica-west1_cluster-1          gke_dryruns_southamerica-west1_cluster-1          
-*         gke_dryruns_southamerica-west1_cluster-santiago   gke_dryruns_southamerica-west1_cluster-santiago   gke_dryruns_southamerica-west1_cluster-santiago   
-          gke_dryruns_us-central1_cluster-iowa              gke_dryruns_us-central1_cluster-iowa              gke_dryruns_us-central1_cluster-iowa      
-```
-
-
-
-3. Install istio
-
-3.1 Download Locally
-
-```shell
-curl -L https://istio.io/downloadIstio | sh -
-cd istio-*
-export PATH=$PWD/bin:$PATH
-```
-
-3.2 Update helm repos
-
-```shell
-kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
-helm repo add istio.io https://istio-release.storage.googleapis.com/charts
-helm repo update
-```
-
-```shell
-kubectl config use-context gke_dryruns_us-central1_cluster-iowa
-helm repo add istio.io https://istio-release.storage.googleapis.com/charts
-helm repo update
-```
-
-3.3 Create contexts in both clusters
-
-```shell
-kubectl create namespace istio-system --context=gke_dryruns_southamerica-west1_cluster-santiago
-kubectl create namespace istio-system --context=gke_dryruns_us-central1_cluster-iowa
-```
-
-3.4 Install Istio Base and istiod with helm
-
-```shell
-kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
-helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
-helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_southamerica-west1_cluster-santiago
-```
-
-
-```shell
-kubectl config use-context gke_dryruns_us-central1_cluster-iowa
-helm install istio-base istio.io/base -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
-helm install istiod istio.io/istiod -n istio-system --kube-context gke_dryruns_us-central1_cluster-iowa
-```
-
-3.5 Enable sidecard injection
-
-```shell
-kubectl config use-context gke_dryruns_southamerica-west1_cluster-santiago
-kubectl label namespace default istio-injection=enabled --context=gke_dryruns_southamerica-west1_cluster-santiago
-```
-
-```shell
-kubectl config use-context gke_dryruns_us-central1_cluster-iowa
-kubectl label namespace default istio-injection=enabled --context=gke_dryruns_us-central1_cluster-iowa
-```
-
-
-4. Deploy app in two clusters with ./deploy.sh script. 
-
-5. Configure Global Load Balancer
-
-5.1 Reserve global IP
-
-```shell
-gcloud compute addresses create istio-global-ip --global
-```
-
-5.2 Create backend services
-
-```shell
-gcloud compute backend-services create istio-backend-santiago \
-    --global \
-    --load-balancing-scheme=EXTERNAL \
-    --protocol=HTTP
-```
-
-```shell
-gcloud compute backend-services create istio-backend-iowa \
-    --global \
-    --load-balancing-scheme=EXTERNAL \
-    --protocol=HTTP
-```
-
-5.3 Add the groups to the backend services. 
-
-get them first with these commands: 
-
-```shell
-gcloud compute instance-groups list --filter="zone:southamerica-west1-*" --format="table(name,zone)"
-NAME: gke-cluster-santiago-default-pool-6a0fc512-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-a
-
-NAME: gke-cluster-santiago-default-pool-d3ac9b18-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-b
-
-NAME: gke-cluster-santiago-default-pool-600d0f70-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/southamerica-west1-c
-```
-
-```shell
-gcloud compute instance-groups list --filter="zone:us-central1-*" --format="table(name,zone)"
-NAME: gke-cluster-iowa-default-pool-78f0eaa2-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-a
-
-NAME: gke-cluster-iowa-default-pool-ba304c41-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-c
-
-NAME: gke-cluster-iowa-default-pool-de9dd29f-grp
-ZONE: https://www.googleapis.com/compute/v1/projects/dryruns/zones/us-central1-f
-```
-
-
-5.4 Add a healthcheck: 
-
-```shell
-gcloud compute health-checks create http istio-health-check \
-    --port 32080
-```
-
-Create firewall rules to allow healthcheck: 
-
-```shell
-gcloud compute firewall-rules create allow-istio-health-check \
-    --network=my-custom-vpc \
-    --allow=tcp:32080 \
-    --source-ranges=130.211.0.0/22,35.191.0.0/16 \
-    --target-tags=gke-ingress
-```
-
-
-5.5 And then add the healthcheck to the backend: 
-
-```shell
-gcloud compute backend-services update istio-backend-santiago \
-    --global --health-checks=istio-health-check
-```
-
-
-```shell
-gcloud compute backend-services update istio-backend-iowa \
-    --global --health-checks=istio-health-check
-```
-
-5.6 Now add them to the as this: 
-
-```shell
-gcloud compute backend-services add-backend istio-backend-santiago \
-    --global \
-    --instance-group=gke-cluster-santiago-default-pool-6a0fc512-grp \
-    --instance-group-zone=southamerica-west1-a
-```
-
-```shell
-gcloud compute backend-services add-backend istio-backend-santiago \
-    --global \
-    --instance-group=gke-cluster-santiago-default-pool-d3ac9b18-grp \
-    --instance-group-zone=southamerica-west1-b
-```
-
-```shell
-gcloud compute backend-services add-backend istio-backend-santiago \
-    --global \
-    --instance-group=gke-cluster-santiago-default-pool-600d0f70-grp \
-    --instance-group-zone=southamerica-west1-c
-```
-
-```shell
-gcloud compute backend-services add-backend istio-backend-iowa \
-    --global \
-    --instance-group=gke-cluster-iowa-default-pool-78f0eaa2-grp \
-    --instance-group-zone=us-central1-a
-```
-
-```shell
-gcloud compute backend-services add-backend istio-backend-iowa \
-    --global \
-    --instance-group=gke-cluster-iowa-default-pool-ba304c41-grp \
-    --instance-group-zone=us-central1-c
-
-```shell
-gcloud compute backend-services add-backend istio-backend-iowa \
-    --global \
-    --instance-group=gke-cluster-iowa-default-pool-de9dd29f-grp \
-    --instance-group-zone=us-central1-f
-```
-
-6. Configure the load balancer
-
-```shell
-gcloud compute url-maps create istio-url-map \
-    --default-service=istio-backend-santiago
-```
-
-```shell
-gcloud compute target-http-proxies create istio-http-proxy \
-    --url-map=istio-url-map
-```
-
-
-```shell
-gcloud compute forwarding-rules create istio-http-forwarding-rule \
-    --global \
-    --target-http-proxy=istio-http-proxy \
-    --ports=80 \
-    --address=istio-global-ip
-```
+Adjust the variables to whatever applies to your case. In this case, the setup is two clusters, one located in southamerica-west1 and the other in us-central1. 
