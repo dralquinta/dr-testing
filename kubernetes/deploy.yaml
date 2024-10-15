@@ -28,7 +28,7 @@ spec:
               divisor: 1
         ports:
         - containerPort: 8080
-      restartPolicy: Set
+      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
