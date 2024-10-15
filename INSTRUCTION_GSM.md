@@ -170,6 +170,12 @@ kubectl patch svc istio-ingressgateway -n istio-system --context=gke_${PROJECT_I
 ```
 
 
+NEG Healthcheck: 
+
+```shell
+gcloud compute backend-services get-health istio-backend --global
+```
+
 Create Healthcheck
 
 ```shell
@@ -190,10 +196,21 @@ Create Firewall Rule
 ```shell
 gcloud compute firewall-rules create allow-istio-health-check \
     --network=my-custom-vpc \
-    --allow=tcp:15021 \
+    --allow=tcp:15021,tcp:15020,tcp:31859,tcp:32080,tcp:31314 \
     --source-ranges=0.0.0.0/0,130.211.0.0/22,35.191.0.0/16 \
     --target-tags=all
 ```
 Create the L7 Load Balancer using the console
 
 See: https://medium.com/niveus-solutions/deploying-anthos-service-mesh-on-private-gke-and-configuring-asm-with-cloud-load-balancing-e47d76c98978 
+
+
+
+NOTE: 
+
+if issues arises with 404 on front end, check the routing on istio, by using: 
+
+```shell
+istioctl proxy-config routes <istio-ingressgateway-pod-name> --context=gke_${PROJECT_ID}_${REGION_XX}_${CLUSTER_NAME_XX} -n istio-system
+
+```

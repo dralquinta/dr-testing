@@ -196,7 +196,7 @@ Create Firewall Rule
 ```shell
 gcloud compute firewall-rules create allow-istio-health-check \
     --network=my-custom-vpc \
-    --allow=tcp:32080,15020 \
+    --allow=tcp:32080,tcp:15020,tcp:15021 \
     --source-ranges=130.211.0.0/22,35.191.0.0/16 \
     --target-tags=gke-ingress
 ```
