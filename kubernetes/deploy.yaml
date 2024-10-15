@@ -19,9 +19,16 @@ spec:
         - name: GKE_REGION
           valueFrom:
             fieldRef:
-              fieldPath: metadata.labels['topology.kubernetes.io/region']
+              fieldPath: spec.nodeName
+        - name: NODE_REGION
+          valueFrom:
+            resourceFieldRef:
+              containerName: nodejs-app
+              resource: requests.cpu
+              divisor: 1
         ports:
         - containerPort: 8080
+      restartPolicy: Set
 ---
 apiVersion: v1
 kind: Service
