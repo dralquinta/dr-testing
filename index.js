@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
     <div style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
       <h1 style="color: #333;">Hello from Node.js!</h1>
       <p style="font-size: 1.2em;">Running on node: <strong>${nodeName}</strong></p>
-      <p style="font-size: 1.2em;">In region: <strong>${region}</strong></p>
+      <p style="font-size: 1.2em;">In node: <strong>${region}</strong></p>
     </div>
   `;
 
